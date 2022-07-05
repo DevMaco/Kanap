@@ -6,7 +6,7 @@ const params = new URLSearchParams(document.location.search); //console.log(docu
 const id = params.get("_id");
 console.log(id); 
 // Récupération des produits de l'api et traitement des données (voir script.js)
-fetch("http://localhost:3000/api/products")
+fetch("http://localhost:3000/api/products/${id}")
   .then((res) => res.json())
   .then((objetProduits) => {
     // execution de la fontion lesProduits
