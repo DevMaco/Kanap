@@ -1,181 +1,373 @@
-// pour différancier la page confirmation et panier
-const page = document.location.href;
+//afficher les produits du LocalStorage
+const productInLocalStorage = JSON.parse(localStorage.getItem("cart"));
 
-// Récupération des produits de l'api
-if (page.match("cart")) {
-fetch("http://localhost:3000/api/products")
-  .then((res) => res.json())
-  .then((objetProduits) => {
-      console.log(objetProduits);
-      affichagePanier(objetProduits);
-  })
-  .catch((err) => {
-      document.querySelector("#cartAndFormContainer").innerHTML = "<h1>erreur 404</h1>";
-      console.log("erreur 404, sur ressource api: " + err);
-  });
-} else {
-  console.log("sur page confirmation");
+async function init() {
+  noProductInLocalStorage();
 }
-// Fonction détermine les conditions d'affichage des produits du panier
-function affichagePanier(index) {
- 
-  let panier = JSON.parse(localStorage.getItem("panierStocké"));
-  if (panier && panier.length != 0) {
-    for (let choix of panier) {
-      for (let g = 0, h = index.length; g < h; g++) {
-        if (choix._id === index[g]._id) {
-          choix.name = index[g].name;
-          choix.prix = index[g].price;
-          choix.image = index[g].imageUrl;
-          choix.description = index[g].description;
-          choix.alt = index[g].altTxt;
-        }
-      }
-    }
-    affiche(panier);
+init();
+
+//Si il n'y as pas de produit dans le localStorage sinon afficher le ou les produits
+function noProductInLocalStorage() {
+  const cartH1 = document.querySelector("h1");
+  if (
+    productInLocalStorage === null ||
+    productInLocalStorage === 0 ||
+    productInLocalStorage.length < 1
+  ) {
+    cartH1.innerText = "Votre panier est vide.";
   } else {
-    // si il n'y a pas de panier on créait un H1 informatif et quantité appropriées
-    document.querySelector("#totalQuantity").innerHTML = "0";
-    document.querySelector("#totalPrice").innerHTML = "0";
-    document.querySelector("h1").innerHTML =
-      "Vous n'avez pas d'article dans votre panier";
+    buildHTMLCart();
   }
-  modifQuantité();
-  suppression();
 }
 
-//Fonction d'affichage d'un panier (tableau)
-
-function affiche(indexé) {
-  // on déclare et on pointe la zone d'affichage
-  let zonePanier = document.querySelector("#cart__items");
-  // on créait les affichages des produits du panier via un map et introduction de dataset dans le code
-  zonePanier.innerHTML += indexé.map((choix) => 
-  `<article class="cart__item" data-id="${choix._id}" data-couleur="${choix.couleur}" data-quantité="${choix.quantité}"> 
-    <div class="cart__item__img">
-      <img src="${choix.image}" alt="${choix.alt}">
-    </div>
-    <div class="cart__item__content">
-      <div class="cart__item__content__titlePrice">
-        <h2>${choix.name}</h2>
-        <span>couleur : ${choix.couleur}</span>
-        <p data-prix="${choix.prix}">${choix.prix} €</p>
-      </div>
-      <div class="cart__item__content__settings">
-        <div class="cart__item__content__settings__quantity">
-          <p>Qté : </p>
-          <input type="number" class="itemQuantity" name="itemQuantity" min="1" max="100" value="${choix.quantité}">
-        </div>
-        <div class="cart__item__content__settings__delete">
-          <p class="deleteItem" data-id="${choix._id}" data-couleur="${choix.couleur}">Supprimer</p>
-        </div>
-      </div>
-    </div>
-  </article>`
-    ).join("");
-  totalProduit();
+//Chercher les produits avec leur ID
+function getProducts(idProduct) {
+  return fetch(`http://localhost:3000/api/products/${idProduct}`)
+    .then((res) => res.json())
+    .then((data) => {
+      return data;
+    })
+    .catch((data) => {
+      return error;
+    });
 }
 
-// fonction modifQuantité on modifie dynamiquement les quantités du panier
+//Crée un nouveau tableau avec les élement des produits au complet
+async function getProductsFromAPI() {
+  let completeProductTable = [];
 
-function modifQuantité() {
-  const cart = document.querySelectorAll(".cart__item");
-  cart.forEach((cart) => {
-    cart.addEventListener("change", (eq) => {
-      // vérification d'information de la valeur du clic et son positionnement dans les articles
-      let panier = JSON.parse(localStorage.getItem("panierStocké"));
-      // boucle pour modifier la quantité du produit du panier grace à la nouvelle valeur
-      for (article of panier)
-        if (
-          article._id === cart.dataset.id &&
-          cart.dataset.couleur === article.couleur
-        ) {
-          article.quantité = eq.target.value;
-          localStorage.panierStocké = JSON.stringify(panier);
-          // on joue la fonction pour actualiser les données
-          totalProduit();
-        }
+  for (const productLS of productInLocalStorage) {
+    await getProducts(productLS.idProduct).then((productAPI) => {
+      completeProductTable.push({
+        id: productAPI._id,
+        name: productAPI.name,
+        img: productAPI.imageUrl,
+        price: productAPI.price,
+        quantity: productLS.quantity,
+        color: productLS.color,
+      });
+    });
+  }
+  return completeProductTable;
+}
+
+async function buildHTMLCart() {
+  const elementToBuildHTML = await getProductsFromAPI();
+
+  elementToBuildHTML.forEach((elementCart) => {
+    const cartSection = document.getElementById("cart__items");
+
+    const cartArcticle = document.createElement("article");
+    cartArcticle.className = "cart__item";
+    cartArcticle.dataset.id = elementCart.id;
+    cartArcticle.dataset.color = elementCart.color;
+    cartSection.appendChild(cartArcticle);
+
+    const cartDivImg = document.createElement("div");
+    cartDivImg.className = "cart__item__img";
+    cartArcticle.appendChild(cartDivImg);
+
+    const cartProductImg = document.createElement("img");
+    cartProductImg.className = "cart__product__img";
+    cartProductImg.src = elementCart.img;
+    cartDivImg.appendChild(cartProductImg);
+
+    const cartDivContent = document.createElement("div");
+    cartDivContent.className = "cart__item__content";
+    cartArcticle.appendChild(cartDivContent);
+
+    const cartDivContentDescription = document.createElement("div");
+    cartDivContentDescription.className = "cart__item__content__desciption";
+    cartDivContent.appendChild(cartDivContentDescription);
+
+    const cartProductName = document.createElement("h2");
+    cartProductName.className = "cart__product__name";
+    cartProductName.innerText = elementCart.name;
+    cartDivContentDescription.appendChild(cartProductName);
+
+    const cartProductColor = document.createElement("p");
+    cartProductColor.innerText = elementCart.color;
+    cartDivContentDescription.appendChild(cartProductColor);
+
+    const cartProductPrice = document.createElement("p");
+    cartProductPrice.className = "cart__product__price";
+    cartProductPrice.innerText = elementCart.price + "€";
+    cartDivContentDescription.appendChild(cartProductPrice);
+
+    const cartDivContentSetting = document.createElement("div");
+    cartDivContentSetting.className = "cart__item__content__settings";
+    cartDivContent.appendChild(cartDivContentSetting);
+
+    const cartContentQuantity = document.createElement("div");
+    cartContentQuantity.className = "cart__item__content__settings__quantity";
+    cartDivContentSetting.appendChild(cartContentQuantity);
+
+    const cartProductQuantity = document.createElement("p");
+    cartProductQuantity.innerText = "Qté :";
+    cartContentQuantity.appendChild(cartProductQuantity);
+
+    const cartInputQuantity = document.createElement("input");
+    cartInputQuantity.type = "number";
+    cartInputQuantity.className = "itemQuantity";
+    cartInputQuantity.name = "itemQuantity";
+    cartInputQuantity.min = "1";
+    cartInputQuantity.max = "100";
+    cartInputQuantity.value = elementCart.quantity;
+    cartContentQuantity.appendChild(cartInputQuantity);
+
+    const cartDivContentDelete = document.createElement("div");
+    cartDivContentDelete.className = "cart__item__content__settings__delete";
+    cartDivContentSetting.appendChild(cartDivContentDelete);
+
+    const cartProductDelete = document.createElement("p");
+    cartProductDelete.className = "deleteItem";
+    cartProductDelete.innerText = "Supprimer";
+    cartDivContentDelete.appendChild(cartProductDelete);
+  });
+  AddEventchangeQuantity();
+  AddEventRemoveQuantity();
+}
+
+// calculer le nombre produit total dans le panier
+function getNumberProduct() {
+  let cart = getCart();
+  let number = 0;
+  for (let product of cart) {
+    number += product.quantity;
+  }
+  let totalQuantity = document.getElementById("totalQuantity");
+  totalQuantity.innerText = number;
+}
+getNumberProduct();
+
+//calculer le prix total du panier
+async function getTotalPrice() {
+  const elementToBuildHTML = await getProductsFromAPI();
+  let totalPrice = 0;
+  for (let product of elementToBuildHTML) {
+    const elementToBuildHTML = getProductsFromAPI();
+    totalPrice += product.quantity * product.price;
+  }
+  let totalPriceCart = document.getElementById("totalPrice");
+  totalPriceCart.innerText = totalPrice;
+}
+getTotalPrice();
+
+//pour changer la quantité des produit du panier
+function AddEventchangeQuantity() {
+  const quantityInput = document.querySelectorAll(".itemQuantity");
+  quantityInput.forEach((quantityProduct) => {
+    quantityProduct.addEventListener("change", (e) => {
+      changeQuantity(e);
     });
   });
 }
-// fonction supression on supprime un article dynamiquement du panier et donc de l'affichage
-function suppression() {
-  // déclaration de variables
-  const cartdelete = document.querySelectorAll(".cart__item .deleteItem");
-  cartdelete.forEach((cartdelete) => {
-    cartdelete.addEventListener("click", () => {
-      let panier = JSON.parse(localStorage.getItem("panierStocké"));
-      for (let d = 0, c = panier.length; d < c; d++)
-        if (
-          panier[d]._id === cartdelete.dataset.id &&
-          panier[d].couleur === cartdelete.dataset.couleur
-        ) {
-          const num = [d];
-          // création d'un tableau miroir, voir mutation
-          let nouveauPanier = JSON.parse(localStorage.getItem("panierStocké"));
-          //suppression de 1 élément à l'indice num
-          nouveauPanier.splice(num, 1);
-          //affichage informatif
-          if (nouveauPanier && nouveauPanier.length == 0) {
-            // si il n'y a pas de panier on créait un H1 informatif et quantité appropriées
-            document.querySelector("#totalQuantity").innerHTML = "0";
-            document.querySelector("#totalPrice").innerHTML = "0";
-            document.querySelector("h1").innerHTML =
-              "Vous n'avez pas d'article dans votre panier";
-          }
-          // on renvoit le nouveau panier converti dans le local storage et on joue la fonction
-          localStorage.panierStocké = JSON.stringify(nouveauPanier);
-          totalProduit(); // logique mais pas obligatoire à cause du reload plus bas qui raffraichit l'affichage; serait necessaire avec suppression sans reload
-          // on recharge la page qui s'affiche sans le produit grace au nouveau panier
-          return location.reload();
-        }
+// fonction pour changer la quantité dans le dom et le local storage
+function changeQuantity(e) {
+  const quantityElement = e.target.closest("input.itemQuantity"); //cibler l'input pour le changement de quantité
+
+  if (quantityElement != null) {
+    //valeur quantité dans le dom
+    const number = quantityElement.value;
+    const productId = e.target
+      .closest("article.cart__item")
+      .getAttribute("data-id");
+    const productColor = e.target
+      .closest("article.cart__item")
+      .getAttribute("data-color");
+    //on vas chercher le contenu du LS
+    let cart = getCart();
+    let foundProduct = cart.findIndex(
+      (p) => p.idProduct === productId && p.color === productColor
+    ); //pour chercher le meme l'id et couleur dans le LS
+
+    if (foundProduct != undefined && number <= 99) {
+      //ajouter la nouvelle quantité au LS
+      cart[foundProduct].quantity = parseInt(number);
+      //push du nouveau panier avec la nouvelle quantité
+      cart.push(localStorage.setItem("cart", JSON.stringify(cart)));
+    }
+  }
+  getNumberProduct();
+  getTotalPrice();
+  location.reload();
+}
+
+function AddEventRemoveQuantity() {
+  const deleteInput = document.querySelectorAll(".deleteItem");
+  deleteInput.forEach((deleteProduct) => {
+    deleteProduct.addEventListener("click", (e) => {
+      removeProduct(e);
     });
   });
 }
 
-// fonction ajout nombre total produit et coût total
+//function  pour supprimer un produit du panier
+function removeProduct(e) {
+  const deleteP = e.target.closest("p.deleteItem"); //cibler le p pour supprimer un produit dans le dom
 
-function totalProduit() {
-  let panier = JSON.parse(localStorage.getItem("panierStocké"));
-  // déclaration variable en tant que nombre
-  let totalArticle = 0;
-  // déclaration variable en tant que nombre
-  let prixCombiné = 0;
-  // déclaration variable en tant que nombre
-  let totalPrix = 0;
-  // j'ajoute toutes les quantités d'article du panier et calcule la somme/prix total
-  for (let article of panier) {
-    totalArticle += JSON.parse(article.quantité);
-    prixCombiné = JSON.parse(article.quantité) * JSON.parse(article.prix);
-    totalPrix += prixCombiné;
-  }
-  // je pointe l'endroit d'affichage nombre d'article
-  document.getElementById("totalQuantity").textContent = totalArticle;
-  // je pointe l'endroit d'affichage du prix total
-  document.getElementById("totalPrice").textContent = totalPrix;
+  const productId = e.target
+    .closest("article.cart__item")
+    .getAttribute("data-id");
+  const productColor = e.target
+    .closest("article.cart__item")
+    .getAttribute("data-color");
+
+  let cart = getCart();
+  cart = cart.filter(
+    (p) => p.idProduct != productId || p.color != productColor
+  ); //chercher les id et color qui ne faut pas supprimer
+
+  cart.push(localStorage.setItem("cart", JSON.stringify(cart))); //push du nouveau panier
+
+  getNumberProduct();
+  getTotalPrice();
+  location.reload();
 }
 
-//  formulaire
-// les données du client seront stockées dans ce tableau pour la commande sur page panier
-if (page.match("cart")) {
-  var contactClient = {};
-  localStorage.contactClient = JSON.stringify(contactClient);
-  // on pointe des éléments input, on attribut à certains la même classe, ils régiront pareil aux différantes regex
-  // on pointe les input nom prénom et ville
-  var prenom = document.querySelector("#firstName");
-  prenom.classList.add("regex_texte");
-  var nom = document.querySelector("#lastName");
-  nom.classList.add("regex_texte");
-  var ville = document.querySelector("#city");
-  ville.classList.add("regex_texte");
-  // on pointe l'input adresse
-  var adresse = document.querySelector("#address");
-  adresse.classList.add("regex_adresse");
-  // on pointe l'input email
-  var email = document.querySelector("#email");
-  email.classList.add("regex_email");
-  // on pointe les élément qui ont la classe .regex_texte
-  var regexTexte = document.querySelectorAll(".regex_texte");
-  // modification du type de l'input type email à text à cause d'un comportement de l'espace blanc non voulu vis à vis de la regex 
-  document.querySelector("#email").setAttribute("type", "text");
+// Function qui permet de récuper l'item "cart"
+function getCart() {
+  let cart = localStorage.getItem("cart");
+  if (cart == null) {
+    return [];
+  } else {
+    return JSON.parse(cart);
+  }
+}
+
+/*---------------------------------- Formulaire ---------------------------------------------*/
+
+// récupération des input du formulaire
+const inputFirstName = document.querySelector("#firstName");
+const errorFirstName = document.querySelector("#firstNameErrorMsg");
+
+const inputLastName = document.querySelector("#lastName");
+const errorLastName = document.querySelector("#lastNameErrorMsg");
+
+const inputAddress = document.querySelector("#address");
+const errorAddress = document.querySelector("#addressErrorMsg");
+
+const inputCity = document.querySelector("#city");
+const errorCity = document.querySelector("#cityErrorMsg");
+
+const inputEmail = document.querySelector("#email");
+const errorEmail = document.querySelector("#emailErrorMsg");
+
+// création regex (expressions réguliéres) pour contrôler le formulaire
+const regExpText = /^[A-Z][A-Za-z\é\è\ê\-]+$/;
+const regExpAddress = /^[0-9A-Za-zÀ-ÖØ-öø-ÿ\-\'\ ]{5,30}$/;
+const regExpEmail = /\b[\w\.-]+@[\w\.-]+\.\w{2,4}\b/i;
+
+let errors = [];
+
+//addEvent pour chaque input du formulaire, appel de la fonction validateForm, avec les paramètres selon l'input
+inputFirstName.addEventListener("change", (e) => {
+  validateForm(
+    inputFirstName,
+    regExpText,
+    errorFirstName,
+    "Merci de saisir votre prénom"
+  );
+});
+
+inputLastName.addEventListener("change", (e) => {
+  validateForm(
+    inputLastName,
+    regExpText,
+    errorLastName,
+    "Merci de saisir votre nom"
+  );
+});
+
+inputAddress.addEventListener("change", (e) => {
+  validateForm(
+    inputAddress,
+    regExpAddress,
+    errorAddress,
+    "Merci de saisir votre adresse"
+  );
+});
+
+inputCity.addEventListener("change", (e) => {
+  validateForm(
+    inputCity,
+    regExpAddress,
+    errorCity,
+    "Merci de saisir votre ville"
+  );
+});
+
+inputEmail.addEventListener("change", (e) => {
+  validateForm(
+    inputEmail,
+    regExpEmail,
+    errorEmail,
+    "Merci de saisir une adresse email valide"
+  );
+});
+
+const button = document.querySelector("#order");
+button.disabled = true;
+
+// test de la valeur rentrer par l'utilisateur et  affichage du message d'erreur
+function validateForm(e, regexp, error, message) {
+  let regexpTest = regexp.test(e.value); //test avec le regex selon input renseigner
+
+  if (regexpTest === false) {
+    error.textContent = message; //texte d'erreur
+    errors.push(error); // push du texte d'erreur si le test regex ne passe pas
+  } else {
+    error.textContent = "☑️"; // validation si le test regex est ok
+    errors = errors.filter((id) => id != error); //aucun message d'erreur si il n'y pas d'erreur
+    button.disabled = false;
+  }
+}
+
+//function pour l'envoie du panier pour la commande
+function validateCart() {
+  const orderForm = document.querySelector(".cart__order__form");
+
+  orderForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    let cart = getCart();
+    let products = [];
+    //si aucune erreur dans le formulaire et que le panier est supérieur à 1 élement on crée une tableau products et un objet contact
+    if (errors.length == 0 && cart.length > 0) {
+      for (product of cart) {
+        products.push(product.idProduct);
+      }
+
+      let contact = {
+        firstName: inputFirstName.value,
+        lastName: inputLastName.value,
+        address: inputAddress.value,
+        city: inputCity.value,
+        email: inputEmail.value,
+      };
+      localStorage.removeItem("cart");
+      sendFormaly(products, contact); // appel de la fonction d'envoi de la commande à l'API
+    }
+  });
+}
+
+validateCart();
+
+//envoi du tableau de produit et l'objet du formualaire à l'API et redirection vers la page confirmation avec l'id de commande
+function sendFormaly(products, contact) {
+  fetch("http://localhost:3000/api/products/order", {
+    method: "POST",
+    headers: {
+      Accept: "application/json, text/plain, */*",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ products, contact }),
+  })
+    .then((res) => res.json())
+    .then((orderData) => {
+      let idOrder = orderData.orderId;
+      document.location.href = `./confirmation.html?id=${idOrder}`;
+    })
+    .catch((error) => {
+      console.log(error);
+    });
 }
