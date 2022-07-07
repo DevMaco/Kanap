@@ -1,7 +1,7 @@
 const uuid = require('uuid/v1');
 const Product = require('../models/Product');
 
-exports.getAllProducts = (req, res ) => {
+exports.getAllProducts = (req, res, next) => {
   Product.find().then(
     (products) => {
       const mappedProducts = products.map((product) => {
@@ -17,7 +17,7 @@ exports.getAllProducts = (req, res ) => {
   );
 };
 
-exports.getOneProduct = (req, res ) => {
+exports.getOneProduct = (req, res, next) => {
   Product.findById(req.params.id).then(
     (product) => {
       if (!product) {
@@ -46,7 +46,7 @@ exports.getOneProduct = (req, res ) => {
  * products: [string] <-- array of product _id
  *
  */
-exports.orderProducts = (req, res) => {
+exports.orderProducts = (req, res, next) => {
   if (!req.body.contact ||
       !req.body.contact.firstName ||
       !req.body.contact.lastName ||
